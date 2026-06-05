@@ -17,16 +17,15 @@ internal class DiskCache(
     private fun bitmapFile(key: String) = File(cacheDir, "$key.jpg")
     private fun metaFile(key: String) = File(cacheDir, "$key.meta")
 
-    /**
-     * Returns the cached [Bitmap] for [key], or null if it doesn't exist or has expired.
-     */
+
+
     fun get(key: String): Bitmap? {
         val imgFile = bitmapFile(key)
         val metaFile = metaFile(key)
 
         if (!imgFile.exists() || !metaFile.exists()) return null
 
-        // Check TTL
+
         val expiryTime = metaFile.readText().trim().toLongOrNull() ?: return null
         if (System.currentTimeMillis() > expiryTime) {
             imgFile.delete()
@@ -41,9 +40,6 @@ internal class DiskCache(
         }
     }
 
-    /**
-     * Persists [bitmap] to disk under [key] and writes the expiry metadata.
-     */
     fun put(key: String, bitmap: Bitmap) {
         try {
             val imgFile = bitmapFile(key)
@@ -53,21 +49,15 @@ internal class DiskCache(
             val expiryTime = System.currentTimeMillis() + ttlMillis
             metaFile(key).writeText(expiryTime.toString())
         } catch (e: Exception) {
-            // Silently ignore disk write failures; memory cache still works
         }
     }
 
-    /**
-     * Removes cached files for the given [key].
-     */
+
     fun remove(key: String) {
         bitmapFile(key).delete()
         metaFile(key).delete()
     }
 
-    /**
-     * Deletes all cached files from the cache directory.
-     */
     fun clear() {
         cacheDir.listFiles()?.forEach { it.delete() }
     }

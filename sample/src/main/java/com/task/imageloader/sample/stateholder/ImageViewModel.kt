@@ -12,9 +12,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-/**
- * UI state for the image grid screen.
- */
 data class ImageUiState(
     val images: List<ImageItem> = emptyList(),
     val isLoading: Boolean = false,
@@ -22,15 +19,6 @@ data class ImageUiState(
     val cacheClearedEvent: Boolean = false
 )
 
-/**
- * ViewModel for [com.example.app.ui.MainActivity].
- *
- * Dependencies are injected by Koin via [com.example.app.di.appModule].
- *
- * @param application  Android application context (required by [AndroidViewModel])
- * @param repository   Fetches the remote image list
- * @param imageLoader  Handles image caching; used for cache invalidation
- */
 class ImageViewModel(
     application: Application,
     private val repository: ImageRepository,
@@ -66,7 +54,7 @@ class ImageViewModel(
         _uiState.update { state ->
             state.copy(
                 cacheClearedEvent = true,
-                images = state.images.toList() // new reference → Compose recomposes cells
+                images = state.images.toList()
             )
         }
     }

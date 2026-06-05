@@ -17,10 +17,6 @@ internal class MemoryCache(
         }
     }
 
-    /**
-     * Retrieves a [Bitmap] for the given [key] if it exists and has not expired.
-     * Expired entries are evicted automatically.
-     */
     fun get(key: String): Bitmap? {
         val entry = lruCache.get(key) ?: return null
         if (entry.isExpired) {
@@ -30,9 +26,6 @@ internal class MemoryCache(
         return entry.bitmap
     }
 
-    /**
-     * Stores a [Bitmap] in the cache under the given [key] with an expiry calculated from now.
-     */
     fun put(key: String, bitmap: Bitmap) {
         val entry = CacheEntry(
             bitmap = bitmap,
@@ -41,16 +34,12 @@ internal class MemoryCache(
         lruCache.put(key, entry)
     }
 
-    /**
-     * Removes the entry for the given [key] from the cache.
-     */
+
     fun remove(key: String) {
         lruCache.remove(key)
     }
 
-    /**
-     * Evicts all entries from the cache.
-     */
+
     fun clear() {
         lruCache.evictAll()
     }

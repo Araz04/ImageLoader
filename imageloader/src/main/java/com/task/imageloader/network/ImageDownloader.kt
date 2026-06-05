@@ -13,10 +13,6 @@ internal class ImageDownloader {
         private const val CONNECT_TIMEOUT_MS = 15_000
         private const val READ_TIMEOUT_MS = 30_000
     }
-
-    /**
-     * Downloads the image at [url] and returns the decoded [Bitmap], or null on failure.
-     */
     suspend fun download(url: String): Bitmap? = withContext(Dispatchers.IO) {
         var connection: HttpURLConnection? = null
         try {
