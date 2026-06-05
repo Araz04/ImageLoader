@@ -11,54 +11,72 @@ internal class DiskCache(
 ) {
 
     init {
-        if (!cacheDir.exists()) cacheDir.mkdirs()
+        if (!cacheDir.exists()) {
+            cacheDir.mkdirs()
+        }
     }
 
-    private fun bitmapFile(key: String) = File(cacheDir, "$key.jpg")
-    private fun metaFile(key: String) = File(cacheDir, "$key.meta")
+    private fun dataFile(key: String) =
+        File(cacheDir, "$key.data")
 
+    private fun metaFile(key: String) =
+        File(cacheDir, "$key.meta")
 
+    fun get(key: String): ByteArray? {
 
-    fun get(key: String): Bitmap? {
-        val imgFile = bitmapFile(key)
+        val dataFile = dataFile(key)
         val metaFile = metaFile(key)
 
-        if (!imgFile.exists() || !metaFile.exists()) return null
+        if (!dataFile.exists() || !metaFile.exists()) {
+            return null
+        }
 
+        val expiryTime =
+            metaFile.readText()
+                .trim()
+                .toLongOrNull()
+                ?: return null
 
-        val expiryTime = metaFile.readText().trim().toLongOrNull() ?: return null
         if (System.currentTimeMillis() > expiryTime) {
-            imgFile.delete()
+            dataFile.delete()
             metaFile.delete()
             return null
         }
 
         return try {
-            BitmapFactory.decodeFile(imgFile.absolutePath)
+            dataFile.readBytes()
         } catch (e: Exception) {
             null
         }
     }
 
-    fun put(key: String, bitmap: Bitmap) {
+    fun put(
+        key: String,
+        bytes: ByteArray
+    ) {
+
         try {
-            val imgFile = bitmapFile(key)
-            FileOutputStream(imgFile).use { out ->
-                bitmap.compress(Bitmap.CompressFormat.JPEG, 90, out)
-            }
-            val expiryTime = System.currentTimeMillis() + ttlMillis
-            metaFile(key).writeText(expiryTime.toString())
-        } catch (e: Exception) {
+
+            dataFile(key).writeBytes(bytes)
+
+            val expiryTime =
+                System.currentTimeMillis() + ttlMillis
+
+            metaFile(key)
+                .writeText(expiryTime.toString())
+
+        } catch (_: Exception) {
         }
     }
 
-
     fun remove(key: String) {
-        bitmapFile(key).delete()
+        dataFile(key).delete()
         metaFile(key).delete()
     }
 
     fun clear() {
-        cacheDir.listFiles()?.forEach { it.delete() }
+        cacheDir.listFiles()?.forEach {
+            it.delete()
+        }
     }
 }

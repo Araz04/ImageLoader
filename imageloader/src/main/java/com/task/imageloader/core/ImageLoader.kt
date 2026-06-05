@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.widget.ImageView
 import androidx.annotation.DrawableRes
+import com.task.imageloader.cache.BitmapDecoder
 import com.task.imageloader.cache.DiskCache
 import com.task.imageloader.cache.MemoryCache
 import com.task.imageloader.network.ImageDownloader
@@ -34,6 +35,7 @@ class ImageLoader private constructor(context: Context) {
     ) {
         val request = ImageRequest.Builder(target)
             .url(url)
+            .resize(300, 300)
             .apply { placeholderRes?.let { placeholder(it) } }
             .build()
         load(request)
@@ -41,37 +43,95 @@ class ImageLoader private constructor(context: Context) {
 
 
     fun load(request: ImageRequest) {
+
         val target = request.target
 
         activeJobs[target]?.cancel()
 
-        request.placeholderRes?.let { target.setImageResource(it) }
+        request.placeholderRes?.let {
+            target.setImageResource(it)
+        }
 
         val cacheKey = cacheKeyFor(request.url)
 
         val job = scope.launch {
-            val cached = memoryCache.get(cacheKey)
-            if (cached != null) {
-                target.setImageBitmap(cached)
+
+            //
+            // MEMORY CACHE
+            //
+            memoryCache.get(cacheKey)?.let { bitmap ->
+                target.setImageBitmap(bitmap)
                 return@launch
             }
 
-            val fromDisk = withContext(Dispatchers.IO) { diskCache.get(cacheKey) }
-            if (fromDisk != null) {
-                memoryCache.put(cacheKey, fromDisk)
-                target.setImageBitmap(fromDisk)
+            val reqWidth = resolveTargetWidth(request)
+            val reqHeight = resolveTargetHeight(request)
+
+            //
+            // DISK CACHE
+            //
+            val cachedBytes = withContext(Dispatchers.IO) {
+                diskCache.get(cacheKey)
+            }
+
+            if (cachedBytes != null) {
+
+                val bitmap = withContext(Dispatchers.Default) {
+                    BitmapDecoder.decode(
+                        bytes = cachedBytes,
+                        reqWidth = reqWidth,
+                        reqHeight = reqHeight
+                    )
+                }
+
+                if (bitmap != null) {
+                    memoryCache.put(cacheKey, bitmap)
+
+                    if (activeJobs[target] == coroutineContext[Job]) {
+                        target.setImageBitmap(bitmap)
+                    }
+
+                    return@launch
+                }
+            }
+
+            //
+            // NETWORK
+            //
+            val downloadedBytes = downloader.download(request.url)
+
+            if (downloadedBytes == null) {
                 return@launch
             }
 
-            val bitmap: Bitmap? = downloader.download(request.url)
+            withContext(Dispatchers.IO) {
+                diskCache.put(
+                    key = cacheKey,
+                    bytes = downloadedBytes
+                )
+            }
+
+            val bitmap = withContext(Dispatchers.Default) {
+                BitmapDecoder.decode(
+                    bytes = downloadedBytes,
+                    reqWidth = reqWidth,
+                    reqHeight = reqHeight
+                )
+            }
+
             if (bitmap != null) {
-                memoryCache.put(cacheKey, bitmap)
-                withContext(Dispatchers.IO) { diskCache.put(cacheKey, bitmap) }
-                if (activeJobs[target] == this.coroutineContext[Job]) {
+
+                memoryCache.put(
+                    key = cacheKey,
+                    bitmap = bitmap
+                )
+
+                if (activeJobs[target] == coroutineContext[Job]) {
                     target.setImageBitmap(bitmap)
                 }
             }
         }
+
         activeJobs[target] = job
     }
 
@@ -90,6 +150,18 @@ class ImageLoader private constructor(context: Context) {
         val md = MessageDigest.getInstance("MD5")
         val digest = md.digest(url.toByteArray())
         return digest.joinToString("") { "%02x".format(it) }
+    }
+
+    private fun resolveTargetWidth(request: ImageRequest): Int {
+        return request.overrideWidth
+            ?: request.target.width.takeIf { it > 0 }
+            ?: 300
+    }
+
+    private fun resolveTargetHeight(request: ImageRequest): Int {
+        return request.overrideHeight
+            ?: request.target.height.takeIf { it > 0 }
+            ?: 300
     }
 
     companion object {

@@ -13,18 +13,33 @@ internal class ImageDownloader {
         private const val CONNECT_TIMEOUT_MS = 15_000
         private const val READ_TIMEOUT_MS = 30_000
     }
-    suspend fun download(url: String): Bitmap? = withContext(Dispatchers.IO) {
+
+    suspend fun download(
+        url: String
+    ): ByteArray? = withContext(Dispatchers.IO) {
+
         var connection: HttpURLConnection? = null
+
         try {
-            connection = (URL(url).openConnection() as HttpURLConnection).apply {
-                connectTimeout = CONNECT_TIMEOUT_MS
-                readTimeout = READ_TIMEOUT_MS
-                requestMethod = "GET"
-                doInput = true
-                connect()
+
+            connection =
+                (URL(url).openConnection() as HttpURLConnection)
+                    .apply {
+                        connectTimeout = CONNECT_TIMEOUT_MS
+                        readTimeout = READ_TIMEOUT_MS
+                        requestMethod = "GET"
+                        doInput = true
+                        connect()
+                    }
+
+            if (connection.responseCode != HttpURLConnection.HTTP_OK) {
+                return@withContext null
             }
-            if (connection.responseCode != HttpURLConnection.HTTP_OK) return@withContext null
-            BitmapFactory.decodeStream(connection.inputStream)
+
+            connection.inputStream.use {
+                it.readBytes()
+            }
+
         } catch (e: Exception) {
             null
         } finally {
