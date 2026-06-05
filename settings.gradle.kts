@@ -23,5 +23,5 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "ImageLoader"
-include(":app")
- 
+include(":sample")
+include(":imageloader")
