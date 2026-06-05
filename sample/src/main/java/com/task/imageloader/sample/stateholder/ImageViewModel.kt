@@ -2,31 +2,31 @@ package com.task.imageloader.sample.stateholder
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.LiveData
+import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
 import com.task.imageloader.core.ImageLoader
 import com.task.imageloader.sample.model.ImageItem
 import com.task.imageloader.sample.repository.ImageRepository
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-
-data class ImageUiState(
-    val images: List<ImageItem> = emptyList(),
-    val isLoading: Boolean = false,
-    val error: String? = null,
-    val cacheClearedEvent: Boolean = false
-)
 
 class ImageViewModel(
     application: Application,
-    private val repository: ImageRepository,
-    private val imageLoader: ImageLoader
+    private val imageLoader: ImageLoader,
+    private val repository: ImageRepository
 ) : AndroidViewModel(application) {
 
-    private val _uiState = MutableStateFlow(ImageUiState())
-    val uiState: StateFlow<ImageUiState> = _uiState.asStateFlow()
+    private val _images = MutableLiveData<List<ImageItem>>()
+    val images: LiveData<List<ImageItem>> = _images
+
+    private val _isLoading = MutableLiveData(false)
+    val isLoading: LiveData<Boolean> = _isLoading
+
+    private val _error = MutableLiveData<String?>()
+    val error: LiveData<String?> = _error
+
+    private val _cacheClearedEvent = MutableLiveData(false)
+    val cacheClearedEvent: LiveData<Boolean> = _cacheClearedEvent
 
     init {
         loadImages()
@@ -34,36 +34,26 @@ class ImageViewModel(
 
     fun loadImages() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null) }
+            _isLoading.value = true
+            _error.value = null
             try {
-                val images = repository.fetchImages()
-                _uiState.update { it.copy(images = images, isLoading = false) }
+                _images.value = repository.fetchImages()
             } catch (e: Exception) {
-                _uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        error = e.localizedMessage ?: "An unexpected error occurred"
-                    )
-                }
+                _error.value = e.localizedMessage ?: "Failed to load images"
+            } finally {
+                _isLoading.value = false
             }
         }
     }
 
     fun invalidateCache() {
         imageLoader.clearCache()
-        _uiState.update { state ->
-            state.copy(
-                cacheClearedEvent = true,
-                images = state.images.toList()
-            )
-        }
+        _cacheClearedEvent.value = true
     }
 
     fun onCacheClearedEventConsumed() {
-        _uiState.update { it.copy(cacheClearedEvent = false) }
+        _cacheClearedEvent.value = false
     }
 
-    fun invalidateUrl(url: String) {
-        imageLoader.invalidate(url)
-    }
+    fun invalidateUrl(url: String) = imageLoader.invalidate(url)
 }
